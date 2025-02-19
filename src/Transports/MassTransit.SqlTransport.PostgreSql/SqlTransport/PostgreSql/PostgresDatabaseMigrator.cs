@@ -213,6 +213,126 @@ namespace MassTransit.SqlTransport.PostgreSql
             SELECT "{0}".create_index_if_not_exists('message_delivery_transport_message_id_ndx',
                     'CREATE INDEX IF NOT EXISTS message_delivery_transport_message_id_ndx ON "{0}".message_delivery (transport_message_id);');
 
+            CREATE TABLE IF NOT EXISTS "{0}".inbox_state
+            (
+                id serial NOT NULL,
+                message_id uuid NOT NULL,
+                consumer_id uuid NOT NULL,
+                lock_id uuid NOT NULL,
+                row_version bytea,
+                received timestamp with time zone NOT NULL,
+                receive_count integer NOT NULL,
+                expiration_time timestamp with time zone,
+            	consumed timestamp with time zone,
+            	delivered timestamp with time zone,
+            	last_sequence_number bigint,
+                CONSTRAINT PK_inbox_state PRIMARY KEY (id),
+            	CONSTRAINT AK_inbox_state_message_id_consumer_id UNIQUE (message_id, consumer_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS "{0}".job_attempt_saga
+            (
+                correlation_id uuid NOT NULL,
+                current_state integer NOT NULL,
+                job_id uuid NOT NULL,
+                retry_attempt integer NOT NULL,
+                service_address text,
+            	instance_address text,
+            	started timestamp with time zone,
+            	faulted timestamp with time zone,
+            	status_check_token_id uuid,
+                CONSTRAINT PK_job_attempt_saga PRIMARY KEY (correlation_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS "{0}".job_saga
+            (
+                correlation_id uuid NOT NULL,
+                current_state integer NOT NULL,
+                submitted timestamp with time zone,
+                service_address text,
+                job_timeout interval,
+                job text,
+                job_type_id uuid NOT NULL,
+            	attempt_id uuid NOT NULL,
+            	retry_attempt integer NOT NULL,
+            	started timestamp with time zone,
+            	completed timestamp with time zone,
+            	duration interval,
+            	faulted timestamp with time zone,
+            	reason text,
+            	job_slot_wait_token uuid,
+            	job_retry_delay_token uuid,
+                CONSTRAINT PK_job_saga PRIMARY KEY (correlation_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS "{0}".job_type_saga
+            (
+                correlation_id uuid NOT NULL,
+                current_state integer NOT NULL,
+                active_job_count integer NOT NULL,
+                concurrent_job_limit integer NOT NULL,
+                override_job_limit integer,
+                override_limit_expiration timestamp with time zone,
+                active_jobs text,
+            	instances text,
+                CONSTRAINT PK_job_type_saga PRIMARY KEY (correlation_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS "{0}".outbox_message
+            (
+                sequence_number serial NOT NULL,
+                enqueue_time timestamp with time zone,
+                sent_time timestamp with time zone NOT NULL,
+                headers text,
+            	properties text,
+            	inbox_message_id uuid,
+            	inbox_consumer_id uuid,
+            	outbox_id uuid,
+            	message_id uuid NOT NULL,
+            	content_type character varying(256) NOT NULL,
+            	message_type text NOT NULL,
+                body text NOT NULL,
+                conversation_id uuid,
+            	correlation_id uuid,
+            	initiator_id uuid,
+            	request_id uuid,
+            	source_address character varying(256),
+            	destination_address character varying(256),
+            	response_address character varying(256),
+            	fault_address character varying(256),
+            	expiration_time timestamp with time zone,
+                CONSTRAINT PK_outbox_message PRIMARY KEY (sequence_number)
+            );
+
+            CREATE TABLE IF NOT EXISTS "{0}".outbox_state
+            (
+                outbox_id uuid NOT NULL,
+                lock_id uuid NOT NULL,
+                row_version bytea,
+                created timestamp with time zone NOT NULL,
+                delivered timestamp with time zone,
+                last_sequence_number bigint,
+                CONSTRAINT PK_outbox_state PRIMARY KEY (outbox_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS "{0}".registration_state
+            (
+                correlation_id uuid NOT NULL,
+                participant_email_address text,
+            	participant_license_number text,
+            	participant_category text,
+                participant_license_expiration_date timestamp with time zone,
+                registration_id uuid,
+                card_number text,
+            	event_id text,
+            	race_id text,
+            	current_state text,
+            	reason text,
+            	retry_attempt integer,
+            	schedule_retry_token uuid,
+                CONSTRAINT PK_registration_state PRIMARY KEY (correlation_id)
+            );
+
             CREATE OR REPLACE FUNCTION "{0}".create_queue(queue_name text, auto_delete integer DEFAULT NULL)
                 RETURNS integer
             AS
